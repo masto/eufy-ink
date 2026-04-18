@@ -442,7 +442,7 @@ class Client:
 
     def connect(self, broker: str | None = None) -> None:
         b = broker or BROKERS.get(self.cfg.ab_code, DEFAULT_BROKER)
-        log.info("connecting mqtts://%s:%d", b, BROKER_PORT)
+        log.debug("connecting mqtts://%s:%d", b, BROKER_PORT)
         self._client.connect(b, BROKER_PORT, keepalive=60)
         self._client.loop_start()
         if not self._connected.wait(timeout=15):
@@ -480,7 +480,7 @@ class Client:
             raise SystemExit(f"MQTT auth failed: {rc}")
         topics = subscribe_topics(self.cfg.station_sn, self.cfg.user_id)
         c.subscribe([(t, 0) for t in topics])
-        log.info("subscribed: %s", topics)
+        log.debug("subscribed: %s", topics)
         self._connected.set()
 
     def _on_subscribe(self, _c, _userdata, _mid, reason_code_list, _props=None):
