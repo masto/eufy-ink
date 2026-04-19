@@ -54,6 +54,40 @@ import paho.mqtt.client as mqtt
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.padding import PKCS7
 
+# Prometheus metrics support (optional dependency).
+try:
+    from prometheus_client import Gauge, start_http_server
+
+    PROMETHEUS_AVAILABLE = True
+except ImportError:
+    PROMETHEUS_AVAILABLE = False
+    start_http_server = None  # type: ignore[assignment]
+
+# --------------------------------------------------------------------------
+# Prometheus metric definitions
+# --------------------------------------------------------------------------
+
+INK_LEVEL = Gauge(
+    "eufy_ink_level_percent",
+    "Ink level percentage remaining",
+    ["channel", "serial"],
+)
+INK_EXPIRY = Gauge(
+    "eufy_ink_expiry_days",
+    "Days until ink cartridge expires",
+    ["channel", "serial"],
+)
+WASTE_TANK_LEVEL = Gauge(
+    "eufy_waste_tank_full_percent",
+    "Waste tank fill percentage",
+    [],
+)
+WASTE_TANK_EXPIRY = Gauge(
+    "eufy_waste_tank_expiry_days",
+    "Days until waste tank expires",
+    [],
+)
+
 # --------------------------------------------------------------------------
 # Constants
 # --------------------------------------------------------------------------
@@ -129,6 +163,27 @@ def _find_profile() -> Path:
 
 
 def load_cfg(device_index: int = 0) -> Cfg:
+    """Load config from environment variables, or fall back to the profile cache.
+
+    Environment variables (all required if used):
+        EUFY_USER_ID      - the user account ID
+        EUFY_EMAIL        - the account email (used as MQTT password)
+        EUFY_REGION       - region code: US, CA, MX, EU, GB, DE, FR, etc.
+        EUFY_STATION_SN   - the printer's serial number
+        EUFY_SECRET_KEY   - 64 hex characters (the AES-256 key)
+    """
+    if os.environ.get("EUFY_USER_ID") and os.environ.get("EUFY_SECRET_KEY"):
+        sk_hex = os.environ["EUFY_SECRET_KEY"]
+        if len(sk_hex) != 64:
+            raise SystemExit(f"EUFY_SECRET_KEY must be 64 hex chars, got {len(sk_hex)}")
+        return Cfg(
+            user_id=os.environ["EUFY_USER_ID"],
+            email=urllib.parse.unquote(os.environ.get("EUFY_EMAIL", "")),
+            ab_code=os.environ.get("EUFY_REGION", "US"),
+            station_sn=os.environ["EUFY_STATION_SN"],
+            secret_key=bytes.fromhex(sk_hex),
+        )
+
     profile = _find_profile()
     dl = json.loads(
         (profile / "cache/offline/device_info/device_list.json").read_text()
@@ -152,6 +207,53 @@ def load_cfg(device_index: int = 0) -> Cfg:
         station_sn=dev["station_sn"],
         secret_key=bytes.fromhex(sk_hex),
     )
+
+
+def update_metrics(payload: dict) -> None:
+    """Update Prometheus gauges from an ink-status payload."""
+    if not PROMETHEUS_AVAILABLE:
+        return
+
+    ink_block = payload.get("ink")
+    waste_block = payload.get("wasteInk")
+
+    if isinstance(ink_block, dict):
+        left = ink_block.get("leftInk")
+        serials = ink_block.get("sn") if isinstance(ink_block.get("sn"), list) else None
+        exp_days = ink_block.get("distanceExpiration")
+
+        if isinstance(left, list):
+            for i, (code, name) in enumerate(INK_CHANNELS):
+                if i >= len(left):
+                    break
+                serial = ""
+                if serials and i < len(serials):
+                    serial = serials[i] or ""
+                pct = _pct(left[i])
+                INK_LEVEL.labels(channel=code, serial=serial).set(
+                    pct if pct is not None else float("nan")
+                )
+                if isinstance(exp_days, list) and i < len(exp_days) and exp_days[i]:
+                    INK_EXPIRY.labels(channel=code, serial=serial).set(exp_days[i])
+                else:
+                    INK_EXPIRY.labels(channel=code, serial=serial).set(float("nan"))
+
+    if isinstance(waste_block, dict):
+        w_left = waste_block.get("leftInk")
+        w_val = None
+        if isinstance(w_left, list) and w_left:
+            w_val = _pct(w_left[0])
+        elif isinstance(w_left, (int, float)):
+            w_val = _pct(w_left)
+        if w_val is not None:
+            WASTE_TANK_LEVEL.set(w_val)
+        else:
+            WASTE_TANK_LEVEL.set(float("nan"))
+        w_exp = waste_block.get("distanceExpiration")
+        if isinstance(w_exp, int) and w_exp:
+            WASTE_TANK_EXPIRY.set(w_exp)
+        else:
+            WASTE_TANK_EXPIRY.set(float("nan"))
 
 
 # --------------------------------------------------------------------------
@@ -526,6 +628,7 @@ class Client:
                 print(json.dumps(item, indent=2, ensure_ascii=False), flush=True)
             if ct == CMD_INK_STATUS:
                 self.latest_ink = item
+                update_metrics(item)
                 rendered = render_ink_block(item, self.cfg.station_sn)
                 if rendered:
                     print(rendered, flush=True)
@@ -607,6 +710,12 @@ def main(argv: list[str]) -> int:
     p.add_argument("--broker", help="override the MQTT broker host")
     p.add_argument("--ca-file", help="CA cert for the broker")
     p.add_argument("--insecure", action="store_true", help="skip TLS verification")
+    p.add_argument(
+        "--metrics-port",
+        type=int,
+        metavar="PORT",
+        help="start an HTTP server on PORT to expose Prometheus metrics (requires --watch)",
+    )
     p.add_argument("-v", "--verbose", action="store_true")
     args = p.parse_args(argv)
 
@@ -621,6 +730,16 @@ def main(argv: list[str]) -> int:
 
     if args.from_file:
         return _decode_from_file(args.from_file, cfg, args.raw)
+
+    if args.metrics_port is not None:
+        if not args.watch:
+            raise SystemExit("--metrics-port requires --watch")
+        if not PROMETHEUS_AVAILABLE:
+            raise SystemExit(
+                "prometheus-client is not installed; run: pip install prometheus-client"
+            )
+        log.info("starting Prometheus metrics server on port %d", args.metrics_port)
+        start_http_server(args.metrics_port)
 
     client = Client(
         cfg,

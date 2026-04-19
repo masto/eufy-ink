@@ -178,6 +178,106 @@ Anker rotates the cert. `--insecure` skips TLS verification entirely.
 In `--watch` the tool re-fires the 1027 status query every `--interval` seconds
 (default 30s) so the printout tracks the printer's current state.
 
+## Docker and Grafana Cloud (optional)
+
+For persistent monitoring and long-term trend analysis, this tool can run in a
+Docker container and push metrics to Grafana Cloud using the Prometheus Agent
+via remote write.
+
+### Architecture
+
+```
+┌──────────────────────┐
+│  eufy-ink container  │  :8080
+│  (MQTT → metrics)    │──────────────┐
+└──────────────────────┘              │ scrape
+                                     ▼
+┌──────────────────────┐       ┌──────────────┐
+│  Prometheus Agent    │◄───────│   Grafana    │
+│  (WAL on disk)       │ push  │   Cloud      │
+│                      │──────►│              │
+└──────────────────────┘       └──────────────┘
+```
+
+The Prometheus Agent runs in "Agent mode" (`--enable-feature=agent`), which is
+specifically designed for this edge-to-cloud pattern. It uses a Write-Ahead Log
+(WAL) stored in the `prometheus_data` Docker volume, so metrics are buffered
+locally and forwarded to Grafana Cloud when connectivity is available. This
+prevents data gaps during internet outages or container restarts.
+
+### Setup
+
+1. **Clone and configure credentials**
+
+   Run the helper script to extract credentials from the profile cache:
+
+   ```bash
+   # Run on the machine with the desktop app installed
+   python3 scripts/export-env.py > .env
+   # Review the output, then copy .env to your container host
+   ```
+
+   Or manually create a `.env` file (keep this file private):
+
+   ```bash
+   cat > .env << 'EOF'
+   EUFY_USER_ID=your_user_id_here
+   EUFY_EMAIL=your.email@example.com
+   EUFY_REGION=US
+   EUFY_STATION_SN=AK7226XXXXXXXXXXX
+   EUFY_SECRET_KEY=your_64_char_hex_key_here
+   EOF
+   ```
+
+2. **Configure Grafana Cloud remote write**
+
+   Open `prometheus.yml` and replace the placeholders:
+   - `<INSTANCE_ID>` — your Grafana Cloud instance ID (found in the portal URL,
+     e.g., `grafana.com/orgs/myorg` → instance ID is in the metrics URL)
+   - `<PROMETHEUS_USER>` — your Grafana Cloud Prometheus user (e.g., `1234567`)
+   - `<PROMETHEUS_PASSWORD>` — your Grafana Cloud API Key with the
+     `MetricsPublisher` role (create one in your Grafana Cloud account under
+     **Security → API Keys**)
+
+3. **Launch**
+
+   ```bash
+   docker compose up -d
+   ```
+
+   This starts two containers:
+   - `eufy-ink` — queries the printer and exposes metrics on port 8080
+   - `prometheus` — scrapes the metrics and pushes them to Grafana Cloud
+
+4. **Verify**
+
+   Check the logs:
+
+   ```bash
+   docker compose logs -f
+   ```
+
+   Visit `http://localhost:9090` to see Prometheus scraping the metrics locally.
+   In Grafana Cloud, go to **Explore → Metrics** and search for `eufy_ink`.
+
+### Prometheus Metrics
+
+The following metrics are exposed when `--metrics-port` is provided:
+
+| Metric                         | Type  | Description                             | Labels          |
+| ------------------------------ | ----- | --------------------------------------- | --------------- |
+| `eufy_ink_level_percent`       | Gauge | Ink remaining per channel (%)           | channel, serial |
+| `eufy_ink_expiry_days`         | Gauge | Days until cartridge expires            | channel, serial |
+| `eufy_waste_tank_full_percent` | Gauge | Waste tank fill level (%)               | —               |
+| `eufy_waste_tank_expiry_days`  | Gauge | Days until waste tank needs replacement | —               |
+
+### Running without the profile cache
+
+Instead of mounting the desktop app's profile directory, you can pass
+credentials directly as environment variables (`EUFY_USER_ID`, `EUFY_EMAIL`,
+`EUFY_REGION`, `EUFY_STATION_SN`, `EUFY_SECRET_KEY`). This is the recommended
+approach for running on a separate host machine.
+
 ## Caveats
 
 - These are cloud-round-tripped numbers. The desktop app also talks to the

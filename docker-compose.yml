@@ -1,0 +1,43 @@
+services:
+  eufy-ink:
+    build: .
+    # Use environment variables for credentials (recommended for container hosts)
+    environment:
+      - EUFY_USER_ID=${EUFY_USER_ID}
+      - EUFY_EMAIL=${EUFY_EMAIL}
+      - EUFY_REGION=${EUFY_REGION:-US}
+      - EUFY_STATION_SN=${EUFY_STATION_SN}
+      - EUFY_SECRET_KEY=${EUFY_SECRET_KEY}
+    # Alternative: mount the profile cache from the host machine
+    # volumes:
+    #   - ~/Library/Application Support/eufyMake Studio Profile:/profile:ro
+    #   - EUFY_PROFILE_DIR=/profile
+    ports:
+      - "8080:8080" # metrics endpoint
+    restart: unless-stopped
+    # Give the container a meaningful name for easy inspection
+    container_name: eufy-ink
+
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    command:
+      - --enable-feature=agent
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.agent.wal-directory=/prometheus/wal
+      - --log.level=warn
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090" # Prometheus UI (optional, for debugging)
+    restart: unless-stopped
+    container_name: prometheus
+    # Ensure prometheus starts after eufy-ink has started its metrics server
+    depends_on:
+      eufy-ink:
+        condition: service_started
+    # Only for development: expose the Prometheus web UI
+    # In production you can remove the ports section for prometheus
+
+volumes:
+  prometheus_data:

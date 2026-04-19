@@ -1,0 +1,29 @@
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+
+scrape_configs:
+  - job_name: "eufy-ink"
+    static_configs:
+      - targets: ["eufy-ink:8080"]
+    metrics_path: "/metrics"
+
+# Remote write to Grafana Cloud
+# Replace the placeholders below with your Grafana Cloud credentials:
+#   - <INSTANCE_ID>: Found in your Grafana Cloud portal (the number after "gcom")
+#   - <PROMETHEUS_USER>: Your Grafana Cloud Prometheus user (e.g., "1234567")
+#   - <PROMETHEUS_PASSWORD>: Your Grafana Cloud API Key with MetricsPublisher role
+remote_write:
+  - url: https://prometheus-prod-<INSTANCE_ID>.grafana.net/api/v1/write
+    bearer_token: "<PROMETHEUS_USER>:<PROMETHEUS_PASSWORD>"
+    # Alternative: use basic_auth instead of bearer_token:
+    # basic_auth:
+    #   username: "<PROMETHEUS_USER>"
+    #   password: "<PROMETHEUS_PASSWORD>"
+    queue_config:
+      # Buffer up to 1000 metrics locally if the remote write fails
+      capacity: 1000
+      max_shards: 5
+      max_samples_per_send: 500
+      # Retry for up to 10 minutes on failures
+      batch_send_deadline: 5m
