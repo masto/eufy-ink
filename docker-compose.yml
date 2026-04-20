@@ -8,6 +8,9 @@ services:
       - EUFY_REGION=${EUFY_REGION:-US}
       - EUFY_STATION_SN=${EUFY_STATION_SN}
       - EUFY_SECRET_KEY=${EUFY_SECRET_KEY}
+      - EUFY_CA_FILE=/certs/make-us.crt
+    volumes:
+      - ./certs/make-us.crt:/certs/make-us.crt:ro
     # Alternative: mount the profile cache from the host machine
     # volumes:
     #   - ~/Library/Application Support/eufyMake Studio Profile:/profile:ro
@@ -23,7 +26,7 @@ services:
     command:
       - --enable-feature=agent
       - --config.file=/etc/prometheus/prometheus.yml
-      - --storage.agent.wal-directory=/prometheus/wal
+      - --storage.agent.path=/prometheus/wal
       - --log.level=warn
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro

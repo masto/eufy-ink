@@ -9,4 +9,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY eufy_ink.py .
 
 # Run in watch mode with metrics endpoint by default when using CMD
-CMD ["python", "eufy_ink.py", "--watch", "--metrics-port", "8080"]
+CMD ["python", "eufy_ink.py", "--watch", "--interval", "900", "--metrics-port", "8080"]

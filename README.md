@@ -229,17 +229,27 @@ prevents data gaps during internet outages or container restarts.
    EOF
    ```
 
-2. **Configure Grafana Cloud remote write**
+2. **Copy the broker CA cert**
 
-   Open `prometheus.yml` and replace the placeholders:
-   - `<INSTANCE_ID>` — your Grafana Cloud instance ID (found in the portal URL,
-     e.g., `grafana.com/orgs/myorg` → instance ID is in the metrics URL)
-   - `<PROMETHEUS_USER>` — your Grafana Cloud Prometheus user (e.g., `1234567`)
-   - `<PROMETHEUS_PASSWORD>` — your Grafana Cloud API Key with the
-     `MetricsPublisher` role (create one in your Grafana Cloud account under
-     **Security → API Keys**)
+   The Anker MQTT broker requires TLS verification. Copy the CA cert from the
+   desktop app into the `certs/` directory:
 
-3. **Launch**
+   ```bash
+   mkdir -p certs
+   cp "/Applications/eufyMake Studio.app/Contents/MacOS/make-us.crt" certs/
+   ```
+
+3. **Configure Grafana Cloud remote write**
+
+   Copy `prometheus.example.yml` to `prometheus.yml` and fill in your Grafana
+   Cloud credentials:
+   - `url` — your Prometheus remote-write endpoint (found in your Grafana Cloud
+     portal under **Integrations → Prometheus → Send Metrics**)
+   - `username` — your Grafana Cloud Prometheus user (e.g., `1234567`)
+   - `password` — your Grafana Cloud API Key with the `MetricsPublisher` role
+     (create one in your Grafana Cloud account under **Security → API Keys**)
+
+4. **Launch**
 
    ```bash
    docker compose up -d
@@ -249,7 +259,7 @@ prevents data gaps during internet outages or container restarts.
    - `eufy-ink` — queries the printer and exposes metrics on port 8080
    - `prometheus` — scrapes the metrics and pushes them to Grafana Cloud
 
-4. **Verify**
+5. **Verify**
 
    Check the logs:
 
