@@ -56,11 +56,12 @@ from cryptography.hazmat.primitives.padding import PKCS7
 
 # Prometheus metrics support (optional dependency).
 try:
-    from prometheus_client import Gauge, start_http_server
+    from prometheus_client import Gauge, Info, start_http_server
 
     PROMETHEUS_AVAILABLE = True
 except ImportError:
     PROMETHEUS_AVAILABLE = False
+    Info = None  # type: ignore[assignment]
     start_http_server = None  # type: ignore[assignment]
 
 # --------------------------------------------------------------------------
@@ -70,12 +71,12 @@ except ImportError:
 INK_LEVEL = Gauge(
     "eufy_ink_level_percent",
     "Ink level percentage remaining",
-    ["channel", "serial"],
+    ["channel"],
 )
 INK_EXPIRY = Gauge(
     "eufy_ink_expiry_days",
     "Days until ink cartridge expires",
-    ["channel", "serial"],
+    ["channel"],
 )
 WASTE_TANK_LEVEL = Gauge(
     "eufy_waste_tank_full_percent",
@@ -86,6 +87,13 @@ WASTE_TANK_EXPIRY = Gauge(
     "eufy_waste_tank_expiry_days",
     "Days until waste tank expires",
     [],
+)
+# Metadata: tracks the currently installed cartridge serial per channel.
+# Using Info prevents stale series when a cartridge is replaced.
+INK_INFO = Info(
+    "eufy_ink",
+    "Ink cartridge metadata",
+    ["channel"],
 )
 
 # --------------------------------------------------------------------------
@@ -230,13 +238,16 @@ def update_metrics(payload: dict) -> None:
                 if serials and i < len(serials):
                     serial = serials[i] or ""
                 pct = _pct(left[i])
-                INK_LEVEL.labels(channel=code, serial=serial).set(
+                INK_LEVEL.labels(channel=code).set(
                     pct if pct is not None else float("nan")
                 )
                 if isinstance(exp_days, list) and i < len(exp_days) and exp_days[i]:
-                    INK_EXPIRY.labels(channel=code, serial=serial).set(exp_days[i])
+                    INK_EXPIRY.labels(channel=code).set(exp_days[i])
                 else:
-                    INK_EXPIRY.labels(channel=code, serial=serial).set(float("nan"))
+                    INK_EXPIRY.labels(channel=code).set(float("nan"))
+                # Update cartridge metadata; automatically replaces old serials.
+                if serial:
+                    INK_INFO.labels(channel=code).info({"serial": serial})
 
     if isinstance(waste_block, dict):
         w_left = waste_block.get("leftInk")
