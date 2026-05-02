@@ -12,7 +12,7 @@ eufyMake UV Printer E1  SN=AK7226XXXXXXXXXXX  (t=17:32:27)
   K  black    76.39 %  sn=AR4803XXXXXXXXXXX  exp_in=164d
   W  white    62.61 %  sn=AR4804XXXXXXXXXXX  exp_in=283d
   G  gloss    71.33 %  sn=AR4805XXXXXXXXXXX  exp_in=280d
-  Waste tank           20.00 % full  exp_in=402d
+  Waste tank  20.00 %  remaining             exp_in=402d
 ```
 
 These are the same numbers that drive the bars in the app's Ink Management panel
@@ -191,9 +191,9 @@ via remote write.
 │  eufy-ink container  │  :8080
 │  (MQTT → metrics)    │──────────────┐
 └──────────────────────┘              │ scrape
-                                     ▼
+                                      ▼
 ┌──────────────────────┐       ┌──────────────┐
-│  Prometheus Agent    │◄───────│   Grafana    │
+│  Prometheus Agent    │◄──────│   Grafana    │
 │  (WAL on disk)       │ push  │   Cloud      │
 │                      │──────►│              │
 └──────────────────────┘       └──────────────┘
