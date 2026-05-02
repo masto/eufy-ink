@@ -274,13 +274,13 @@ prevents data gaps during internet outages or container restarts.
 
 The following metrics are exposed when `--metrics-port` is provided:
 
-| Metric                         | Type  | Description                             | Labels  |
-| ------------------------------ | ----- | --------------------------------------- | ------- |
-| `eufy_ink_level_percent`       | Gauge | Ink remaining per channel (%)           | channel |
-| `eufy_ink_expiry_days`         | Gauge | Days until cartridge expires            | channel |
-| `eufy_waste_tank_full_percent` | Gauge | Waste tank fill level (%)               | —       |
-| `eufy_waste_tank_expiry_days`  | Gauge | Days until waste tank needs replacement | —       |
-| `eufy_ink_info`                | Info  | Cartridge serial number (metadata)      | channel |
+| Metric                        | Type  | Description                             | Labels  |
+| ----------------------------- | ----- | --------------------------------------- | ------- |
+| `eufy_ink_level_percent`      | Gauge | Ink remaining per channel (%)           | channel |
+| `eufy_ink_expiry_days`        | Gauge | Days until cartridge expires            | channel |
+| `eufy_waste_tank_percent`     | Gauge | Waste tank remaining (%)                | —       |
+| `eufy_waste_tank_expiry_days` | Gauge | Days until waste tank needs replacement | —       |
+| `eufy_ink_info`               | Info  | Cartridge serial number (metadata)      | channel |
 
 Cartridge serial numbers are stored in the `eufy_ink_info` metric rather than as
 labels on the ink gauges. This prevents stale series from accumulating when a

@@ -78,9 +78,9 @@ INK_EXPIRY = Gauge(
     "Days until ink cartridge expires",
     ["channel"],
 )
-WASTE_TANK_LEVEL = Gauge(
-    "eufy_waste_tank_full_percent",
-    "Waste tank fill percentage",
+WASTE_TANK = Gauge(
+    "eufy_waste_tank_percent",
+    "Waste tank remaining percentage",
     [],
 )
 WASTE_TANK_EXPIRY = Gauge(
@@ -257,9 +257,9 @@ def update_metrics(payload: dict) -> None:
         elif isinstance(w_left, (int, float)):
             w_val = _pct(w_left)
         if w_val is not None:
-            WASTE_TANK_LEVEL.set(w_val)
+            WASTE_TANK.set(w_val)
         else:
-            WASTE_TANK_LEVEL.set(float("nan"))
+            WASTE_TANK.set(float("nan"))
         w_exp = waste_block.get("distanceExpiration")
         if isinstance(w_exp, int) and w_exp:
             WASTE_TANK_EXPIRY.set(w_exp)
@@ -462,8 +462,9 @@ def render_ink_block(
         }
 
     `leftInk` inside `ink` is "% remaining" in 1/100ths of a percent.
-    `leftInk` inside `wasteInk` is "% full" in the same units (per
-    charliex2's write-up).
+    `leftInk` inside `wasteInk` is "% remaining" in the same units (the
+    tank is full at 10000 and empties as it fills; per charliex2's write-up
+    the field is misleadingly labelled "% full").
     """
     ink_block = payload.get("ink")
     waste_block = payload.get("wasteInk")
@@ -497,9 +498,8 @@ def render_ink_block(
         w_exp = waste_block.get("distanceExpiration")
         w_bits = ["  Waste tank"]
         if w_val is not None:
-            # `leftInk` in the wasteInk block is "% full", not "% remaining"
-            # (the tank fills up over time as spent ink collects).
-            w_bits.append(f"          {w_val:6.2f} % full")
+            # The wasteInk leftInk value is "% remaining" (0 = full tank).
+            w_bits.append(f"          {w_val:6.2f} % remaining")
         else:
             w_bits.append("             —")
         if isinstance(w_exp, int) and w_exp:
