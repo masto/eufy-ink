@@ -499,7 +499,7 @@ def render_ink_block(
         w_bits = ["  Waste tank"]
         if w_val is not None:
             # The wasteInk leftInk value is "% remaining" (0 = full tank).
-            w_bits.append(f"          {w_val:6.2f} % remaining")
+            w_bits.append(f" {w_val:6.2f} %  remaining           ")
         else:
             w_bits.append("             —")
         if isinstance(w_exp, int) and w_exp:
