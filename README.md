@@ -2,7 +2,8 @@
 
 Print the real ink levels from an eufyMake UV Printer E1 on the command line, as
 numbers, because the desktop app only shows a gradient bar that's nearly
-impossible to read for the White and Gloss channels.
+impossible to read for the White and Gloss channels. But see the note below
+before relying on these numbers!
 
 ```
 eufyMake UV Printer E1  SN=AK7226XXXXXXXXXXX  (t=17:32:27)
@@ -17,6 +18,19 @@ eufyMake UV Printer E1  SN=AK7226XXXXXXXXXXX  (t=17:32:27)
 
 These are the same numbers that drive the bars in the app's Ink Management panel
 (to the hundredth of a percent), pulled straight off Anker's MQTT broker, live.
+
+## CRITICAL NOTE REGARDING ACCURACY
+
+Experience has shown that these values, despite having two decimal places of
+precision, do not accurately reflect the ink level in the printer. There does
+not seem to be a mechanism in the cartridge to measure the level other than a
+low ink float switch. The software probably just tries to keep track of how much
+ink has been used, and this doesn't seem to track reality very well. I have seen
+it jump instantly from 50% to the 10% low ink warning (which is actually
+reported as 12%).
+
+In other words, while you may find it interesting to have this data, you cannot
+and should not rely on it in any kind of production environment.
 
 ## How it works
 
