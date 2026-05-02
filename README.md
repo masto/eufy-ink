@@ -326,6 +326,12 @@ approach for running on a separate host machine.
 - The ACL on Anker's broker seems to allow multiple subscribers per user (the
   desktop app, this tool, and your phone can all be connected at the same time).
 
+## Disclaimer
+
+This software is not authorized or created by Eufy or Anker Innovations, and has
+no relationship whatsoever to their companies or brands. It is an independent
+project created by a user of their products.
+
 ## Credits / references
 
 - Charlie Xenophon's initial write-up of the protocol:
