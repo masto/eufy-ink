@@ -284,6 +284,32 @@ prevents data gaps during internet outages or container restarts.
    Visit `http://localhost:9090` to see Prometheus scraping the metrics locally.
    In Grafana Cloud, go to **Explore → Metrics** and search for `eufy_ink`.
 
+### A note on the Grafana Cloud free tier
+
+The free tier enforces a per-tenant request-rate limit (currently **75
+requests/s**) on the remote-write endpoint. Even with a tiny number of metrics,
+it is easy to trip this limit during WAL replay after a restart or a brief
+network outage, because Prometheus by default uses multiple parallel shards and
+treats `429 Too Many Requests` as a **non-recoverable** error — meaning the
+samples are dropped, leaving gaps in your graphs.
+
+The bundled `prometheus.example.yml` is configured to handle this:
+
+```yaml
+queue_config:
+  min_shards: 1
+  max_shards: 1 # one in-flight request at a time
+  max_samples_per_send: 2000
+  capacity: 10000
+  batch_send_deadline: 30s
+  retry_on_http_429: true # the key fix: retry instead of drop
+  min_backoff: 1s
+  max_backoff: 5m
+```
+
+If you upgrade to a paid plan or run your own Mimir/Prometheus, you can raise
+`max_shards` again for higher throughput.
+
 ### Prometheus Metrics
 
 The following metrics are exposed when `--metrics-port` is provided:

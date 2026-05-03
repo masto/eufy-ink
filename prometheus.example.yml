@@ -18,12 +18,22 @@ remote_write:
     basic_auth:
       username: "<PROMETHEUS_USER>"
       password: "<PROMETHEUS_PASSWORD>"
+    # Retry on 429 (rate limit) responses instead of dropping samples.
+    # Required for the Grafana Cloud free tier, which enforces a per-tenant
+    # request-rate limit (75 req/s) that is easy to trip during WAL replay
+    # after a restart or reconnect.
     queue_config:
-      # Buffer up to 1000 metrics locally if the remote write fails
-      capacity: 1000
-      max_shards: 5
-      max_samples_per_send: 500
-      # Retry for up to 10 minutes on failures
-      batch_send_deadline: 5m
+      # We emit only ~20 metrics every 2 minutes, so a single shard with
+      # generous batching is more than enough. Multiple shards send parallel
+      # requests, which is exactly what trips the rate limit.
+      min_shards: 1
+      max_shards: 1
+      max_samples_per_send: 2000
+      capacity: 10000
+      batch_send_deadline: 30s
+      # Aggressive 429 backoff so a brief throttle doesn't snowball.
+      retry_on_http_429: true
+      min_backoff: 1s
+      max_backoff: 5m
     metadata_config:
-      send_interval: 2m
+      send_interval: 5m
